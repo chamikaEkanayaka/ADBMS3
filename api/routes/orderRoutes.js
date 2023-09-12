@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 
+const axios = require('axios'); // For Node.js
+
 //postgres connection
 const pool = new Pool({
     user: 'postgres',
@@ -10,6 +12,7 @@ const pool = new Pool({
     password: '1234',
     port: 5432,
 });
+
 
 //insert order
 router.post('/', (req, res, next) => {
@@ -21,6 +24,46 @@ router.post('/', (req, res, next) => {
     const order_status = req.body.order_status;
     const shipping_address = req.body.shipping_address;
     const payment_status = req.body.payment_status;
+
+    //check product_id is available
+    const url = `http://localhost:9090/inventory/check/${product_id}`;
+
+    axios.get(url)
+        .then(response => {
+            isAvailable = response.data.isAvailable;
+            remainQuantity = response.data.remainQuantity;
+        })
+        .catch(error => {
+            console.error('Axios error:', error);
+    });
+
+    if (isAvailable == 1){
+        if (remainQuantity >= quantity){
+            const query = `INSERT INTO orders (user_id, product_id, order_date, quantity, total_price, order_status, shipping_address, payment_status)
+            VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7)
+            RETURNING *;
+            `;
+    
+            pool.query(query,[user_id, product_id, quantity, total_price, order_status, shipping_address, payment_status], (error, results) => {
+                if (error){
+                    console.log(error);
+                    res.status(500).json({
+                        "error": error
+                    })
+                }else{
+                    console.log("order insert");
+                    res.status(200).json({
+                        "message": "order insert"
+                    })
+                }
+            })
+        } else {
+            console.log("Not enough qunatity remain");
+            res.json({"message" : "not enough qunatity remain"})
+        }
+    } else {
+        res.status(404).json({"message" : "productId not available"});
+    }
 })
 
 //get all orders
