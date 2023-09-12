@@ -2,8 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 
-const itemQuantity = require('./inventoryRoutes');
-
 //postgres connection
 const pool = new Pool({
     user: 'postgres',
