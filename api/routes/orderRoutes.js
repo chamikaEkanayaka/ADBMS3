@@ -30,41 +30,98 @@ router.post('/', (req, res, next) => {
 
     axios.get(url)
         .then(response => {
-            isAvailable = response.data.isAvailable;
+            isProductAvailable = response.data.isAvailable;
             remainQuantity = response.data.remainQuantity;
+            if (isProductAvailable == 1){
+                if (remainQuantity >= quantity){
+
+                    //check user_id is available
+                    fetch(`http://localhost:8080/user/check/${user_id}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            if (response.status === 404) {
+                                // Handle 404 Not Found
+                                console.log("UserId is not available");
+                                res.status(404).json({"message": "UserId is not available"});
+                            } else {
+                                // Handle other non-200 status codes
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(data);
+                        if (data.message === 'found') {
+                            //if userId available
+                            
+                            //insert order
+                            const query = `INSERT INTO orders (user_id, product_id, order_date, quantity, total_price, order_status, shipping_address, payment_status)
+                            VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7)
+                            RETURNING *;
+                            `;
+                    
+                            pool.query(query,[user_id, product_id, quantity, total_price, order_status, shipping_address, payment_status], (error, results) => {
+                                if (error){
+                                    console.log(error);
+                                    res.status(500).json({
+                                        "error": error
+                                    })
+                                }else{
+                                    console.log("order insert");
+                                    res.status(200).json({
+                                        "message": "order insert",
+                                        results
+                                    })
+                                }
+                            })
+
+                            // //update the inventory
+
+                            const url = `http://localhost:9090/inventory/quantity/${product_id}`;
+                            const data = {
+                                newQuantity: `${remainQuantity-quantity}`
+                            };
+
+                            axios.patch(url, data)
+                            .then(response => {
+                                console.log('Success:', response.data);
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                            });
+
+                        } else if (data.message === 'not found') {
+                            console.log("UserId is not available");
+                            res.status(404).json({"message" : "UserId is not available"});
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Fetch error:', error);
+                    });
+                    //
+
+                } else {
+                    console.log("Not enough quantity");
+                    res.status(200).json({"message" : "Not enough quantity"});
+                }
+            } else {
+                console.log("ProductId is not available");
+                res.status(404).json({"message" : "ProductId is not available"});
+            }
         })
         .catch(error => {
+            isProductAvailable = 0;
+            remainQuantity = 0;
             console.error('Axios error:', error);
     });
+});
 
-    if (isAvailable == 1){
-        if (remainQuantity >= quantity){
-            const query = `INSERT INTO orders (user_id, product_id, order_date, quantity, total_price, order_status, shipping_address, payment_status)
-            VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7)
-            RETURNING *;
-            `;
-    
-            pool.query(query,[user_id, product_id, quantity, total_price, order_status, shipping_address, payment_status], (error, results) => {
-                if (error){
-                    console.log(error);
-                    res.status(500).json({
-                        "error": error
-                    })
-                }else{
-                    console.log("order insert");
-                    res.status(200).json({
-                        "message": "order insert"
-                    })
-                }
-            })
-        } else {
-            console.log("Not enough qunatity remain");
-            res.json({"message" : "not enough qunatity remain"})
-        }
-    } else {
-        res.status(404).json({"message" : "productId not available"});
-    }
-})
 
 //get all orders
 router.get('/', (req, res, next) => {
