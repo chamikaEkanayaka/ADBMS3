@@ -60,8 +60,22 @@ The API expects all requests to be in JSON format. The responses will also be in
 
 **Example request & response:**
 
-    ```bash
+Request:
+
     {
+      "user_id": 1,
+      "product_id": 2,
+      "quantity": 3,
+      "total_price": 100,
+      "order_status": "pending",
+      "shipping_address": "123 Main Street",
+      "payment_status": "paid"
+    }
+
+      
+Response:
+
+      {
       "user_id": 1,
       "product_id": 2,
       "quantity": 3,
